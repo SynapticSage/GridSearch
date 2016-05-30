@@ -278,7 +278,7 @@ classdef ParameterExplorer < handle
                 % Mark job as completed
                 this.markFile(workSpace(i).params);
                 % Delete the job
-                delete(job{i});
+                %delete(job{i});
             end
             
         end
@@ -292,7 +292,7 @@ classdef ParameterExplorer < handle
                 for i = 1:numel(job)
                     if job{i}.isvalid && ...
                             isequal(job{i}.State,'finished')
-                        this.lastvalid = i; delete(job{i});
+                        this.lastvalid = i; %delete(job{i});
                     end
                 end
             end
@@ -331,6 +331,7 @@ classdef ParameterExplorer < handle
             end
 			
 			filename=[this.sessionsID '_constants.log'];
+            warning off; mkdir(folder); warning on;
 			f=fopen(fullfile(folder,filename),'w');
 			
 			for c = fields(this.constspace)'
@@ -352,7 +353,7 @@ classdef ParameterExplorer < handle
 			fclose(f);
         end
         % -----------------------------------------------------------------
-        function struct2add2 = assignVars(this,varstruct,struct2add2)
+        function struct2add2 = assignVars(this,varstruct,struct2add2,structInd)
             % this function has two modes of operation, for the two types
             % of runs, batch versus sequential execution. if you pass a
             % struct2add2 then it adds the variables one by one that
@@ -366,8 +367,11 @@ classdef ParameterExplorer < handle
                 end
                 struct2add2='NULL';
             else
+                if ~exist('structInd','var')
+                    structInd=1;
+                end
                 for c = fields(varstruct)'
-                    struct2add2.(c{1}) = varstruct.(c{1});
+                    struct2add2(structInd).(c{1}) = varstruct.(c{1});
                 end
             end
             
@@ -436,7 +440,7 @@ classdef ParameterExplorer < handle
 				
 				% Add constant variables if user provided them
 				if ~isempty(fields(this.constspace))
-					workSpace = this.assignVars(this.constspace,workSpace);
+					workSpace = this.assignVars(this.constspace,workSpace,current);
 				end
 				
 				% Make sure folder exists, so that can save diary output
