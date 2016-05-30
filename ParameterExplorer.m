@@ -1,4 +1,5 @@
 classdef ParameterExplorer < handle
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	% Author: Ryan Y
 	%
 	% The purpose of this class is to define a super simplistic suite for
@@ -12,23 +13,38 @@ classdef ParameterExplorer < handle
     % Now actually saves progress with tags! You can actually name the tags
     % sensible things to differentiate your runs.
     %
-    % TODO : Need a better way of parallel jobs reporting errors, instead
-    % of relying on the job to still be on the stack after runs, or
-    % checking the file diary. TODO : Add ability to iterate over pool
-    % vector. Pool should contain a vector of pool objects who are each
-    % tied to either a local core or a cluster object's core. TODO : Add
-    % ability to poll cluster for number of cpus and automatically create a
-    % vector  of pool objects for 1/2(cpuNumber).
-	% TODO : Add ability to give computer SSH targets, to get other
-	% computers to run scripts on this. Distributed computing toolbox is
-	% thousands of dollars, and it's just easier to get around it by
-	% distributing work through SSH ... number 
-    % TODO : Add mode for creating/controlling script send into Brandeis's
-    % cluster TODO : Add cancel callback function in multiWaitbar, so user
-    % can run other things and come back where left off in
-    % ParameterExplorer BETATESTING : Add support for common workspace input,
-    % i.e., constant variables given to all sets all sets TODO : Make mode
-    % where write a function or script per set
+    % TODO :    Need a better way of parallel jobs reporting errors, instead
+    %           of relying on the job to still be on the stack after runs,
+    %           or checking the file diary. TODO : Add ability to iterate
+    %           over pool vector. Pool should contain a vector of pool
+    %           objects who are each tied to either a local core or a
+    %           cluster object's core.
+    %
+    % TODO :    Add ability to poll cluster for number of cpus and
+    %           automatically create a vector  of pool objects for
+    %           1/2(cpuNumber).
+    %
+	% TODO :    Add ability to give computer SSH targets, to get other
+	%           computers to run scripts on this. Distributed computing
+	%           toolbox is thousands of dollars, and it's just easier to
+	%           get around it by distributing work through SSH ... number
+    %
+    % TODO :    Add mode for creating/controlling script send into
+    %           Brandeis's cluster
+    %
+    % TODO :    Add cancel callback function in multiWaitbar, so user
+    %           can run other things and come back where left off in
+    %           ParameterExplorer 
+    %
+    % BETATESTING : Add support for common workspace input,
+    %               i.e., constant variables given to all sets all sets
+    %               TODO : Make mode where write a function or script per
+    %               set
+    %
+    % TODO :    Add mode where can read in the written constants into a
+    %           project folder and apply them automagically.
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
 	%% Public Properties
 	properties
 		% --------------------------------------------------------------------
@@ -309,28 +325,53 @@ classdef ParameterExplorer < handle
 		end
 		% -----------------------------------------------------------------
 		function recordConstants(this,folder)
+            
+            if isempty(fields(this.constspace))
+                return;
+            end
 			
 			filename=[this.sessionsID '_constants.log'];
-			f=fopen(fullfile(folder,filename));
+			f=fopen(fullfile(folder,filename),'w');
 			
-			for c = fields(this.constspace)
+			for c = fields(this.constspace)'
 				
-				if ischar(this.constspace.(c))
-					right_hand_side = this.constspace.(c);
-				elseif isnumeric(this.constspace.(c)) ...
-						|| islogical(this.constspace.(c))
-					right_hand_side = num2str(this.constspace.(c));
+				if ischar(this.constspace.(c{1}))
+					right_hand_side = this.constspace.(c{1});
+				elseif isnumeric(this.constspace.(c{1})) ...
+						|| islogical(this.constspace.(c{1}))
+					right_hand_side = num2str(this.constspace.(c{1}));
 				end
 				
-				left_hand_side = c;
+				left_hand_side = c{1};
 				
-				this_const = [left_hand_side '=' right_hand_side];
+				this_const = sprintf([left_hand_side '=' right_hand_side '\n']);
 				
 				fwrite(f,this_const);
 			end
 			
 			fclose(f);
-		end
+        end
+        % -----------------------------------------------------------------
+        function struct2add2 = assignVars(this,varstruct,struct2add2)
+            % this function has two modes of operation, for the two types
+            % of runs, batch versus sequential execution. if you pass a
+            % struct2add2 then it adds the variables one by one that
+            % struct (ie the workspace struct that controls which variables
+            % show up in parallel execution of jobs); if it's not passed,
+            % then it directly assigns the variables into the base
+            
+            if ~exist('struct2add2','var')
+                for c = fields(varstruct)'
+                    assignin('base',c{1},varstruct.(c{1}));
+                end
+                struct2add2='NULL';
+            else
+                for c = fields(varstruct)'
+                    struct2add2.(c{1}) = varstruct.(c{1});
+                end
+            end
+            
+        end
         %% Private Methods - Run Types
 		% --------------------------------------------------------------------
 		% Versions of the run function
@@ -395,9 +436,7 @@ classdef ParameterExplorer < handle
 				
 				% Add constant variables if user provided them
 				if ~isempty(fields(this.constspace))
-					pairs = [fields(workSpace.params), struct2cell(workSpace.params); ...
-						fields(this.constspace), struct2cell(this.constspace)]';
-					workSpace.params=struct(pairs{:});
+					workSpace = this.assignVars(this.constspace,workSpace);
 				end
 				
 				% Make sure folder exists, so that can save diary output
@@ -480,9 +519,7 @@ classdef ParameterExplorer < handle
 					
 					% add constant variables if user provided them
 					if ~isempty(fields(this.constspace))
-						pairs = [fields(params), struct2cell(params); ...
-							fields(this.constspace), struct2cell(this.constspace)]';
-						params=struct(pairs{:});
+						this.assignVars(this.constspace);
 					end
 
                     % assign the parameter combination in the base scope
@@ -519,9 +556,7 @@ classdef ParameterExplorer < handle
 					
 					% add constant variables if user provided them
 					if ~isempty(fields(this.constspace))
-						pairs = [fields(params), struct2cell(params); ...
-							fields(this.constspace), struct2cell(this.constspace)]';
-						params=struct(pairs{:});
+						this.assignVars(this.constspace);
 					end
                     
                     % assign the parameter combination in the base scope
